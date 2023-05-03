@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks>net472;net6.0;net7.0</TargetFrameworks>
+        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
         <AssemblyTitle>AssetStudio Mod by VaDiM</AssemblyTitle>
         <Version>0.16.48.1</Version>
         <Copyright>Copyright © Perfare; Copyright © aelurum 2023</Copyright>
@@ -19,7 +19,7 @@
         <ProjectReference Include="..\AssetStudio\AssetStudio.csproj" />
     </ItemGroup>
     
-    <!-- Use local compiled win-x86 and win-x64 Texture2DDecoder libs, because libs from Kyaru.Texture2DDecoder.Windows were compiled with /MD flag -->
+    <!-- Use local compiled win-x64 Texture2DDecoder libs, because libs from Kyaru.Texture2DDecoder.Windows were compiled with /MD flag -->
 
     <Target Name="CopyExtraFilesPortable" AfterTargets="AfterBuild" Condition=" '$(RuntimeIdentifier)' == '' ">
         <Message Text="Copying windows extra files for $(TargetFramework)... " Importance="high" />
@@ -27,7 +27,7 @@
         <Copy SourceFiles="$(ProjectDir)Libraries\win-x64\fmod.dll" DestinationFolder="$(TargetDir)runtimes\win-x64\native" ContinueOnError="false" />
     </Target>
 
-    <Target Name="CopyExtraFilesPortableNet" AfterTargets="AfterBuild" Condition=" '$(RuntimeIdentifier)' == '' AND '$(TargetFramework)' != 'net472' ">
+    <Target Name="CopyExtraFilesPortableNet" AfterTargets="AfterBuild" Condition=" '$(RuntimeIdentifier)' == ''">
         <Message Text="Copying other platforms extra files for $(TargetFramework)... " Importance="high" />
         <Copy SourceFiles="$(ProjectDir)Libraries\linux-x64\libfmod.so" DestinationFolder="$(TargetDir)runtimes\linux-x64\native" ContinueOnError="false" />
         <Copy SourceFiles="$(ProjectDir)Libraries\osx-x64\libfmod.dylib" DestinationFolder="$(TargetDir)runtimes\osx-x64\native" ContinueOnError="false" />
@@ -42,7 +42,7 @@
         <Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\fmod.dll" DestinationFolder="$(PublishDir)runtimes\win-x64\native" ContinueOnError="false" />
     </Target>
 
-    <Target Name="PublishExtraFilesPortableNet" AfterTargets="Publish" Condition=" '$(RuntimeIdentifier)' == '' AND '$(TargetFramework)' != 'net472' ">
+    <Target Name="PublishExtraFilesPortableNet" AfterTargets="Publish" Condition=" '$(RuntimeIdentifier)' == ''">
         <Message Text="Publishing other platforms extra files for Portable build ($(TargetFramework))... " Importance="high" />
         <Copy SourceFiles="$(TargetDir)runtimes\linux-x64\native\libfmod.so" DestinationFolder="$(PublishDir)runtimes\linux-x64\native" ContinueOnError="false" />
         <Copy SourceFiles="$(TargetDir)runtimes\osx-x64\native\libfmod.dylib" DestinationFolder="$(PublishDir)runtimes\osx-x64\native" ContinueOnError="false" />
