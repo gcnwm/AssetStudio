@@ -2,9 +2,9 @@ name: AssetStudioBuild
 
 on:
   push:
-    branches: [ AssetStudio-mod ]
+    branches: [ build ]
   pull_request:
-    branches: [ AssetStudio-mod ]
+    branches: [ build ]
 
   workflow_dispatch:
 
@@ -14,7 +14,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: microsoft/setup-msbuild@v1.1
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.3.1
+        with:
+          vs-version: '17.0'
+          msbuild-architecture: 'x64'
       
       - name: Download FBX SDK
         run: |
@@ -28,15 +33,22 @@ jobs:
 
       - name: Nuget Restore
         run: nuget restore
-        
-      - name: Build .Net472
-        run: msbuild /p:Configuration=Release /p:TargetFramework=net472 /verbosity:minimal
 
       - name: Build .Net6
         run: msbuild /t:AssetStudioGUI:publish /p:Configuration=Release /p:TargetFramework=net6.0-windows /p:SelfContained=false /verbosity:minimal
 
-      - name: Upload .Net6 Artifact
-        uses: actions/upload-artifact@v2
+
+      - name: Compress Release
+        run: |
+          cd AssetStudioGUI/bin/Release/net6.0-windows/publish
+          Compress-Archive -Path * -DestinationPath AssetStudioGUI_dotNET60.zip
+
+      - name: Releases
+        uses: softprops/action-gh-release@v1
         with:
-          name: AssetStudio.net6
-          path: AssetStudioGUI/bin/Release/net6.0-windows/publish
+          files: |
+            AssetStudioGUI/bin/Release/net6.0-windows/publish/AssetStudioGUI_dotNET60.zip
+          name: ${{ github.sha }}
+          body: ${{ github.sha }}
+          draft: false
+          prerelease: false

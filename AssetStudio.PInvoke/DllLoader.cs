@@ -24,7 +24,6 @@ namespace AssetStudio.PInvoke
 
         private static string GetDirectedDllDirectory(string localDir)
         {
-            var win32Path = Path.Combine("runtimes", "win-x86", "native");
             var win64Path = Path.Combine("runtimes", "win-x64", "native");
             var subDir = Environment.Is64BitProcess ? win64Path : win32Path;
 
