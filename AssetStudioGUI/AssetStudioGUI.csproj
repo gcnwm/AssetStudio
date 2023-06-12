@@ -5,9 +5,10 @@
         <TargetFrameworks>net6.0-windows;net8.0-windows</TargetFrameworks>
         <UseWindowsForms>true</UseWindowsForms>
         <ApplicationIcon>Resources\as.ico</ApplicationIcon>
-        <AssemblyTitle>AssetStudio Mod by VaDiM</AssemblyTitle>
-        <Version>0.16.48.1</Version>
-        <Copyright>Copyright © Perfare 2018-2022</Copyright>
+        <AssemblyTitle>AssetStudioMod by aelurum</AssemblyTitle>
+        <AssemblyName>AssetStudioModGUI</AssemblyName>
+        <Version>0.17.0.0</Version>
+        <Copyright>Copyright © Perfare 2018-2022; Copyright © aelurum 2021-2023</Copyright>
         <DebugType>embedded</DebugType>
     </PropertyGroup>
 
@@ -41,6 +42,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ContentWithTargetPath Include="..\LICENSE">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>LICENSE</TargetPath>
+        </ContentWithTargetPath>
         <PackageReference Include="OpenTK" Version="4.7.7" />
         <Reference Include="OpenTK.WinForms">
             <HintPath>Libraries\OpenTK.WinForms.dll</HintPath>
@@ -48,6 +53,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft-WindowsAPICodePack-Core-6.0" Version="1.1.5" />
+        <PackageReference Include="Microsoft-WindowsAPICodePack-Shell-6.0" Version="1.1.5" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     </ItemGroup>
 

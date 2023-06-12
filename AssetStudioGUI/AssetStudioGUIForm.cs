@@ -12,12 +12,14 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
 using static AssetStudioGUI.Studio;
 using Font = AssetStudio.Font;
+using Microsoft.WindowsAPICodePack.Taskbar;
 #if NET472
 using Vector3 = OpenTK.Vector3;
 using Vector4 = OpenTK.Vector4;
@@ -105,6 +107,8 @@ namespace AssetStudioGUI
 
         private GUILogger logger;
 
+        private TaskbarManager taskbar = TaskbarManager.Instance;
+
         [DllImport("gdi32.dll")]
         private static extern IntPtr AddFontMemResourceEx(IntPtr pbFont, uint cbFont, IntPtr pdv, [In] ref uint pcFonts);
 
@@ -112,13 +116,14 @@ namespace AssetStudioGUI
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
             InitializeComponent();
-            Text = $"AssetStudioGUI v{Application.ProductVersion}";
+            Text = $"{Application.ProductName} v{Application.ProductVersion}";
             delayTimer = new System.Timers.Timer(800);
             delayTimer.Elapsed += new ElapsedEventHandler(delayTimer_Elapsed);
             displayAll.Checked = Properties.Settings.Default.displayAll;
             displayInfo.Checked = Properties.Settings.Default.displayInfo;
             enablePreview.Checked = Properties.Settings.Default.enablePreview;
             FMODinit();
+            listSearchFilterMode.SelectedIndex = 0;
 
             logger = new GUILogger(StatusStripUpdate);
             Logger.Default = logger;
@@ -141,14 +146,8 @@ namespace AssetStudioGUI
             {
                 ResetForm();
                 assetsManager.SpecifyUnityVersion = specifyUnityVersion.Text;
-                if (paths.Length == 1 && Directory.Exists(paths[0]))
-                {
-                    await Task.Run(() => assetsManager.LoadFolder(paths[0]));
-                }
-                else
-                {
-                    await Task.Run(() => assetsManager.LoadFiles(paths));
-                }
+                await Task.Run(() => assetsManager.LoadFilesAndFolders(out openDirectoryBackup, paths));
+                saveDirectoryBackup = openDirectoryBackup;
                 BuildAssetStructures();
             }
         }
@@ -159,9 +158,8 @@ namespace AssetStudioGUI
             if (openFileDialog1.ShowDialog(this) == DialogResult.OK)
             {
                 ResetForm();
-                openDirectoryBackup = Path.GetDirectoryName(openFileDialog1.FileNames[0]);
                 assetsManager.SpecifyUnityVersion = specifyUnityVersion.Text;
-                await Task.Run(() => assetsManager.LoadFiles(openFileDialog1.FileNames));
+                await Task.Run(() => assetsManager.LoadFilesAndFolders(out openDirectoryBackup, openFileDialog1.FileNames));
                 BuildAssetStructures();
             }
         }
@@ -173,9 +171,8 @@ namespace AssetStudioGUI
             if (openFolderDialog.ShowDialog(this) == DialogResult.OK)
             {
                 ResetForm();
-                openDirectoryBackup = openFolderDialog.Folder;
                 assetsManager.SpecifyUnityVersion = specifyUnityVersion.Text;
-                await Task.Run(() => assetsManager.LoadFolder(openFolderDialog.Folder));
+                await Task.Run(() => assetsManager.LoadFilesAndFolders(out openDirectoryBackup, openFolderDialog.Folder));
                 BuildAssetStructures();
             }
         }
@@ -217,7 +214,6 @@ namespace AssetStudioGUI
         {
             if (assetsManager.assetsFileList.Count == 0)
             {
-                filterExcludeModeCheck(assetsManager.assetsFileList.Count);
                 Logger.Info("No Unity file can be loaded.");
                 return;
             }
@@ -227,11 +223,11 @@ namespace AssetStudioGUI
 
             if (!string.IsNullOrEmpty(productName))
             {
-                Text = $"AssetStudioGUI v{Application.ProductVersion} - {productName} - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
+                Text = $"{Application.ProductName} v{Application.ProductVersion} - {productName} - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
             }
             else
             {
-                Text = $"AssetStudioGUI v{Application.ProductVersion} - no productName - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
+                Text = $"{Application.ProductName} v{Application.ProductVersion} - no productName - {assetsManager.assetsFileList[0].unityVersion} - {assetsManager.assetsFileList[0].m_TargetPlatform}";
             }
 
             assetListView.VirtualListSize = visibleAssets.Count;
@@ -255,8 +251,6 @@ namespace AssetStudioGUI
             }
             typeMap.Clear();
             classesListView.EndUpdate();
-
-            filterExcludeModeCheck(exportableAssets.Count);
 
             var types = exportableAssets.Select(x => x.Type).Distinct().OrderBy(x => x.ToString()).ToArray();
             foreach (var type in types)
@@ -616,7 +610,7 @@ namespace AssetStudioGUI
             {
                 listSearch.Text = "";
                 listSearch.ForeColor = SystemColors.WindowText;
-                enableFiltering = true;
+                BeginInvoke(new Action(() => { enableFiltering = true; }));
             }
         }
 
@@ -627,6 +621,7 @@ namespace AssetStudioGUI
                 enableFiltering = false;
                 listSearch.Text = " Filter ";
                 listSearch.ForeColor = SystemColors.GrayText;
+                listSearch.BackColor = System.Drawing.Color.White;
             }
         }
 
@@ -649,7 +644,23 @@ namespace AssetStudioGUI
         private void delayTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             delayTimer.Stop();
+            ListSearchHistoryAdd();
             Invoke(new Action(FilterAssetList));
+        }
+
+        private void ListSearchHistoryAdd()
+        {
+            BeginInvoke(new Action(() =>
+            {
+                if (listSearch.Text != "" && listSearch.Text != " Filter ")
+                {
+                    if (listSearchHistory.Items.Count == listSearchHistory.MaxDropDownItems)
+                    {
+                        listSearchHistory.Items.RemoveAt(listSearchHistory.MaxDropDownItems - 1);
+                    }
+                    listSearchHistory.Items.Insert(0, listSearch.Text);
+                }
+            }));
         }
 
         private void assetListView_ColumnClick(object sender, ColumnClickEventArgs e)
@@ -1295,6 +1306,16 @@ namespace AssetStudioGUI
             {
                 progressBar1.Value = value;
             }
+
+            BeginInvoke(new Action(() => 
+            {
+                var max = progressBar1.Maximum;
+                taskbar.SetProgressValue(value, max);
+                if (value == max)
+                    taskbar.SetProgressState(TaskbarProgressBarState.NoProgress);
+                else
+                    taskbar.SetProgressState(TaskbarProgressBarState.Normal);
+            }));
         }
 
         private void StatusStripUpdate(string statusText)
@@ -1311,7 +1332,7 @@ namespace AssetStudioGUI
 
         private void ResetForm()
         {
-            Text = $"AssetStudioGUI v{Application.ProductVersion}";
+            Text = $"{Application.ProductName} v{Application.ProductVersion}";
             assetsManager.Clear();
             assemblyLoader.Clear();
             exportableAssets.Clear();
@@ -1335,6 +1356,8 @@ namespace AssetStudioGUI
             reverseSort = false;
             enableFiltering = false;
             listSearch.Text = " Filter ";
+            listSearch.ForeColor = SystemColors.GrayText;
+            listSearch.BackColor = System.Drawing.Color.White;
             if (tabControl1.SelectedIndex == 1)
                 assetListView.Select();
 
@@ -1344,6 +1367,7 @@ namespace AssetStudioGUI
                 filterTypeToolStripMenuItem.DropDownItems.RemoveAt(1);
             }
 
+            taskbar.SetProgressState(TaskbarProgressBarState.NoProgress);
             FMODreset();
         }
 
@@ -1634,22 +1658,11 @@ namespace AssetStudioGUI
             return selectedAssets;
         }
 
-        private void filterExcludeMode_CheckedChanged(object sender, EventArgs e)
-        {
-            FilterAssetList();
-        }
-
-        private void filterExcludeModeCheck(int itemCount)
-        {
-            filterExcludeMode.Enabled = itemCount > 0;
-            if (!filterExcludeMode.Enabled)
-            {
-                filterExcludeMode.Checked = false;
-            }
-        }
-
         private void FilterAssetList()
         {
+            if (exportableAssets.Count < 1)
+                return;
+
             assetListView.BeginUpdate();
             assetListView.SelectedIndices.Clear();
             var show = new List<ClassIDType>();
@@ -1671,19 +1684,49 @@ namespace AssetStudioGUI
             }
             if (listSearch.Text != " Filter ")
             {
-                if (filterExcludeMode.Checked)
+                var mode = (ListSearchFilterMode)listSearchFilterMode.SelectedIndex;
+                switch (mode)
                 {
-                    visibleAssets = visibleAssets.FindAll(
-                        x => x.Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0 &&
-                        x.SubItems[1].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0 &&
-                        x.SubItems[3].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0);
-                }
-                else
-                {
-                    visibleAssets = visibleAssets.FindAll(
-                        x => x.Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        x.SubItems[1].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        x.SubItems[3].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0);
+                    case ListSearchFilterMode.Include:
+                        visibleAssets = visibleAssets.FindAll(
+                            x => x.Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            x.SubItems[1].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            x.SubItems[3].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) >= 0);
+                        break;
+                    case ListSearchFilterMode.Exclude:
+                        visibleAssets = visibleAssets.FindAll(
+                            x => x.Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0 &&
+                            x.SubItems[1].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0 &&
+                            x.SubItems[3].Text.IndexOf(listSearch.Text, StringComparison.OrdinalIgnoreCase) <= 0);
+                        break;
+                    case ListSearchFilterMode.RegexName:
+                    case ListSearchFilterMode.RegexContainer:
+                        StatusStripUpdate("");
+                        var pattern = listSearch.Text;
+                        var regexOptions = RegexOptions.IgnoreCase | RegexOptions.Singleline;
+                        try
+                        {
+                            if (mode == ListSearchFilterMode.RegexName)
+                            {
+                                visibleAssets = visibleAssets.FindAll(x => Regex.IsMatch(x.Text, pattern, regexOptions));
+                            }
+                            else
+                            {
+                                visibleAssets = visibleAssets.FindAll(x => Regex.IsMatch(x.SubItems[1].Text, pattern, regexOptions));
+                            }
+                            listSearch.BackColor = System.Drawing.Color.PaleGreen;
+                        }
+                        catch (ArgumentException e)
+                        {
+                            listSearch.BackColor = System.Drawing.Color.FromArgb(255, 160, 160);
+                            StatusStripUpdate($"Regex error: {e.Message}");
+                        }
+                        catch (RegexMatchTimeoutException)
+                        {
+                            listSearch.BackColor = System.Drawing.Color.FromArgb(255, 160, 160);
+                            StatusStripUpdate($"Timeout error");
+                        }
+                        break;
                 }
             }
             assetListView.VirtualListSize = visibleAssets.Count;
@@ -1813,6 +1856,28 @@ namespace AssetStudioGUI
                 node.Collapse(ignoreChildren: false);
             }
             sceneTreeView.EndUpdate();
+        }
+
+        private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var aboutForm = new AboutForm();
+            aboutForm.ShowDialog(this);
+        }
+
+        private void listSearchFilterMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            listSearch.BackColor = System.Drawing.Color.White;
+            if (listSearch.Text != " Filter ")
+            {
+                FilterAssetList();
+            }
+        }
+
+        private void listSearchHistory_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            listSearch.Text = listSearchHistory.Text;
+            listSearch.Focus();
+            listSearch.SelectionStart = listSearch.Text.Length;
         }
 
         #region FMOD

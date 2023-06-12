@@ -28,6 +28,7 @@ namespace AssetStudioCLI.Options
         None,
         TypeName,
         ContainerPath,
+        ContainerPathFull,
         SourceFileName,
     }
 
@@ -155,10 +156,11 @@ namespace AssetStudioCLI.Options
                 optionDefaultValue: AssetGroupOption.ContainerPath,
                 optionName: "-g, --group-option <value>",
                 optionDescription: "Specify the way in which exported assets should be grouped\n" +
-                    "<Value: none | type | container(default) | filename>\n" +
+                    "<Value: none | type | container(default) | containerFull | filename>\n" +
                     "None - Do not group exported assets\n" +
                     "Type - Group exported assets by type name\n" +
                     "Container - Group exported assets by container path\n" +
+                    "ContainerFull - Group exported assets by full container path (e.g. with prefab name)\n" +
                     "Filename - Group exported assets by source file name\n" +
                     "Example: \"-g container\"\n",
                 optionHelpGroup: HelpGroups.General
@@ -291,7 +293,7 @@ namespace AssetStudioCLI.Options
             (
                 optionDefaultValue: false,
                 optionName: "--not-restore-extension",
-                optionDescription: "(Flag) If specified, AssetStudio will not try to restore TextAssets extension name, \nand will just export all TextAssets with the \".txt\" extension",
+                optionDescription: "(Flag) If specified, AssetStudio will not try to use/restore original TextAsset\nextension name, and will just export all TextAssets with the \".txt\" extension",
                 optionHelpGroup: HelpGroups.Advanced,
                 isFlag: true
             );
@@ -474,6 +476,9 @@ namespace AssetStudioCLI.Options
                                     break;
                                 case "container":
                                     o_groupAssetsBy.Value = AssetGroupOption.ContainerPath;
+                                    break;
+                                case "containerfull":
+                                    o_groupAssetsBy.Value = AssetGroupOption.ContainerPathFull;
                                     break;
                                 case "filename":
                                     o_groupAssetsBy.Value = AssetGroupOption.SourceFileName;
@@ -734,7 +739,7 @@ namespace AssetStudioCLI.Options
             }
             else
             {
-                Console.WriteLine($"# {appAssembly.Name}\n# Based on AssetStudio Mod v{appAssembly.Version}\n");
+                Console.WriteLine($"# {appAssembly.Name}\n# Based on AssetStudioMod v{appAssembly.Version}\n");
                 Console.WriteLine($"{usage}\n\n{helpMessage}");
             }
         }

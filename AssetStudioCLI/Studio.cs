@@ -33,14 +33,7 @@ namespace AssetStudioCLI
             assetsManager.SpecifyUnityVersion = options.o_unityVersion.Value;
             assetsManager.SetAssetFilter(options.o_exportAssetTypes.Value);
 
-            if (Directory.Exists(options.inputPath))
-            {
-                assetsManager.LoadFolder(options.inputPath);
-            }
-            else
-            {
-                assetsManager.LoadFiles(options.inputPath);
-            }
+            assetsManager.LoadFilesAndFolders(options.inputPath);
             if (assetsManager.assetsFileList.Count == 0)
             {
                 Logger.Warning("No Unity file can be loaded.");
@@ -261,18 +254,24 @@ namespace AssetStudioCLI
             var toExportCount = parsedAssetsList.Count;
             var exportedCount = 0;
 
+            var groupOption = options.o_groupAssetsBy.Value;
             foreach (var asset in parsedAssetsList)
             {
                 string exportPath;
-                switch (options.o_groupAssetsBy.Value)
+                switch (groupOption)
                 {
                     case AssetGroupOption.TypeName:
                         exportPath = Path.Combine(savePath, asset.TypeString);
                         break;
                     case AssetGroupOption.ContainerPath:
+                    case AssetGroupOption.ContainerPathFull:
                         if (!string.IsNullOrEmpty(asset.Container))
                         {
                             exportPath = Path.Combine(savePath, Path.GetDirectoryName(asset.Container));
+                            if (groupOption == AssetGroupOption.ContainerPathFull)
+                            {
+                                exportPath = Path.Combine(exportPath, Path.GetFileNameWithoutExtension(asset.Container));
+                            }
                         }
                         else
                         {
